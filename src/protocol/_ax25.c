@@ -8,7 +8,7 @@
 
 #include <netax25/axlib.h>
 
-// static ax25_address null_ax25_address = {{0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x00}};
+/* The module exception */
 static PyObject *AX25Error;
 
 /* The module doc string */
@@ -17,11 +17,11 @@ PyDoc_STRVAR(_ax25__doc__, "AX.25 protocol functions.");
 /* The function doc string */
 PyDoc_STRVAR(aton__doc__,     "aton(call) -> addr\n\nConvert call sign to network address.");
 PyDoc_STRVAR(ntoa__doc__,     "ntoa(addr) -> call\n\nConvert network address to call sign.");
-PyDoc_STRVAR(socket__doc__,   "socket() -> socket\n\nCreate an AX.25 socket.");
+PyDoc_STRVAR(socket__doc__,   "socket([type]) -> socket\n\nCreate an AX.25 socket.");
 PyDoc_STRVAR(accept__doc__,   "accept() -> (conn, address)\n\nAccept a connection.");
 PyDoc_STRVAR(bind__doc__,     "bind(fd, call)\n\nBind socket to listen for connections to call.");
-PyDoc_STRVAR(listen__doc__,   "listen(fd, backlog)\n\nMark the socket on fd as passive socket.");
-PyDoc_STRVAR(send__doc__,     "send(fd, buf, len, flags)\n\nTransmit message to another socket.");
+PyDoc_STRVAR(recvfrom__doc__, "recvfrom(fd, len, flags)\n\nReceive message from another socket.");
+PyDoc_STRVAR(sendto__doc__,   "sendto(fd, buf, len, flags, addr)\n\nTransmit message to another socket.");
 PyDoc_STRVAR(validate__doc__, "validate(addr) -> bool\n\nValidate an AX.25 network address.");
 
 /* The wrapper to the underlying C functions */
@@ -70,9 +70,14 @@ py_ax25_ntoa(PyObject *self, PyObject *args) {
 
 static PyObject *
 py_ax25_socket(PyObject *self, PyObject *args) {
-    int fd, errnum;
+    int fd, type = SOCK_SEQPACKET, errnum = 0;
 
-    if ((fd = socket(AF_AX25, SOCK_SEQPACKET, 0)) == -1) {
+    if (!PyArg_ParseTuple(args, "|i", &type)) {
+        PyErr_SetString(AX25Error, "Invalid arguments supplied");
+        return NULL;
+    }
+
+    if ((fd = socket(AF_AX25, type, 0)) == -1) {
         errnum = errno;
         PyErr_SetString(AX25Error, strerror(errnum));
         return NULL;
@@ -131,35 +136,19 @@ py_ax25_bind(PyObject *self, PyObject *args) {
 }
 
 static PyObject *
-py_ax25_listen(PyObject *self, PyObject *args) {
-    int fd, backlog;
-    int errnum = 0;
-
-    if (!PyArg_ParseTuple(args, "i|i", &fd, &backlog)) {
-        PyErr_SetString(AX25Error, "File descriptor argument required");
-        return NULL;
-    }
-
-    if (backlog <= 0) {
-        backlog = SOMAXCONN;
-    }
-
-    if (listen(fd, backlog) == -1) {
-        errnum = errno;
-        PyErr_SetString(AX25Error, strerror(errnum));
-        return NULL;
-    } else {
-        return Py_None;
-    }
+py_ax25_recvfrom(PyObject *self, PyObject *args) {
+    return NULL;
 }
 
 static PyObject *
-py_ax25_send(PyObject *self, PyObject *args) {
+py_ax25_sendto(PyObject *self, PyObject *args) {
     int fd, flags, errnum;
     size_t len, sent;
-    const char *buf;
+    const char *buf, *addr;
+    struct full_sockaddr_ax25 *dest = (struct full_sockaddr_ax25 *) malloc(sizeof(struct full_sockaddr_ax25));
+    socklen_t addrlen;
 
-    if (!PyArg_ParseTuple(args, "isi|i", &fd, &buf, &len, &flags)) {
+    if (!PyArg_ParseTuple(args, "isiis", &fd, &buf, &len, &flags, &addr)) {
         PyErr_SetString(AX25Error, "Not all arguments supplied");
         return NULL;
     }
@@ -167,8 +156,14 @@ py_ax25_send(PyObject *self, PyObject *args) {
     if (flags < 0) {
         flags = 0;
     }
+    
+    if (ax25_aton(addr, dest) == -1) {
+        PyErr_SetString(AX25Error, "Malformed AX.25 call sign");
+        return NULL;
+    }
 
-    if ((sent = send(fd, buf, len, flags)) == -1) {
+    addrlen = sizeof(struct full_sockaddr_ax25);
+    if ((sent = sendto(fd, buf, len, flags, (struct sockaddr *) &dest, addrlen)) == -1) {
         errnum = errno;
         PyErr_SetString(AX25Error, strerror(errnum));
         return NULL;
@@ -202,8 +197,8 @@ static PyMethodDef _ax25_methods[] = {
     {"socket",       py_ax25_socket,       0,            socket__doc__},
     {"accept",       py_ax25_accept,       METH_VARARGS, accept__doc__},
     {"bind",         py_ax25_bind,         METH_VARARGS, bind__doc__},
-    {"listen",       py_ax25_listen,       METH_VARARGS, listen__doc__},
-    {"send",         py_ax25_send,         METH_VARARGS, send__doc__},
+    {"recvfrom",     py_ax25_recvfrom,     METH_VARARGS, recvfrom__doc__},
+    {"sendto",       py_ax25_sendto,       METH_VARARGS, sendto__doc__},
     {"validate",     py_ax25_validate,     METH_VARARGS, validate__doc__},
     {NULL, NULL} /* sentinel */
 };

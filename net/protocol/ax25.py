@@ -1,14 +1,10 @@
 from ctypes import *
 from ctypes.util import find_library
-import cooked
-import re
 import socket as python_socket
-import struct
 
 # Lib AX25
-import sys
-print sys.path
 from net.protocol import _ax25
+from net.protocol import _bare, bare
 
 
 error = _ax25.error
@@ -26,15 +22,9 @@ def ntoa(addr):
 def validate(addr):
     return _ax25.validate(addr)
 
-class socket(object):
-    def __init__(self, family=_ax25.FAMILY, type=_ax25.TYPE, proto=0, fd=0):
-        self.family = family
-        self.type = type
-        self.proto = proto
-        if fd:
-            self.fd = fd
-        else:
-            self.fd = _ax25.socket()
+class socket(bare.socket):
+    def __init__(self, family=bare.AF_AX25, type=bare.SOCK_SEQPACKET, proto=0, fd=0):
+        super(socket, self).__init__(family, type, proto, fd)
 
     def accept(self):
         addr, fd = _ax25.accept(self.fileno())
@@ -43,20 +33,6 @@ class socket(object):
     def bind(self, call):
         return _ax25.bind(self.fileno(), call)
 
-    def fileno(self):
-        return self.fd
-
     @staticmethod
     def fromfd(fd, family, type):
         return socket(family=family, type=type, fd=fd)
-
-    def listen(self, backlog=128):
-        return _ax25.listen(self.fileno(), backlog)
-
-    def send(self, string, flags=0):
-        return _ax25.send(self.fileno(), string, len(string), flags)
-
-    def write(self, string, flags=0):
-        return self.send(string, flags=flags)
-
-
