@@ -11,6 +11,12 @@ from net.async.const import *
 from net.async.hookable import Hookable
 from net.tools import get_errno
 
+# For Python < 2.6
+try:
+    from net.async import _epoll
+except ImportError:
+    _epoll = None
+
 def mask_str(eventmask):
     masks = []
     masks.append('WRITABLE')
@@ -51,6 +57,8 @@ class Multiplexer(Hookable):
         # BSD kqueue (FreeBSD, Mac OSX)
         elif hasattr(select, 'kqueue'):
             return kqueue_like_epoll()
+        elif _epoll:
+            return cooked_like_epoll()
         else:
             return select_like_epoll()
 
@@ -173,13 +181,13 @@ class kqueue_like_epoll(object):
     def unregister(self, fd):
         self.control(fd, self.fds.pop(fd), select.KQ_EV_DELETE)
 
-    def poll(self, timeout=0):
+    def poll(self, timeout=0, maxevents=1024):
         # kqueue only supports positive intergers or None
         timeout = max(0, timeout)
 
         # Iterate over all events
         events = defaultdict(int)
-        queued = self.kqueue.control(None, 1024, timeout)
+        queued = self.kqueue.control(None, maxevents, timeout)
         for event in queued:
             if event.filter == select.KQ_FILTER_READ:
                 events[event.ident] |= READABLE
@@ -193,6 +201,33 @@ class kqueue_like_epoll(object):
                 events[event.ident] |= ERROR
 
         return events.items()
+
+
+class cooked_like_epoll(object):
+    def __init__(self):
+        self.epollfd = _epoll.create()
+
+    def close(self):
+        os.close(self.fileno())
+
+    def fileno(self):
+        return self.epollfd
+
+    def fromfd(self, fd):
+        self.epollfd = fd
+
+    def register(self, fd, eventmask):
+        _epoll.control(self.epollfd, _epoll.EPOLL_CTL_ADD, fd, eventmask)
+
+    def modify(self, fd, eventmask):
+        _epoll.control(self.epollfd, _epoll.EPOLL_CTL_MOD, fd, eventmask)
+
+    def unregister(self, fd):
+        _epoll.control(self.epollfd, _epoll.EPOLL_CTL_DEL, fd, eventmask)
+
+    def poll(self, timeout=0, maxevents=1024):
+        timeout = min(timeout, 0)
+        return _epoll.wait(self.epollfd, int(timeout * 1000))
 
 
 class select_like_epoll(object):
