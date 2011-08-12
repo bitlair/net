@@ -16,6 +16,11 @@ try:
     from net.async import _epoll
 except ImportError:
     _epoll = None
+try:
+    from net.async import _kqueue
+except ImportError:
+    _kqueue = None
+
 
 def mask_str(eventmask):
     masks = []
@@ -58,7 +63,9 @@ class Multiplexer(Hookable):
         elif hasattr(select, 'kqueue'):
             return kqueue_like_epoll()
         elif _epoll:
-            return cooked_like_epoll()
+            return _epoll_like_epoll()
+        elif _kqueue:
+            return _kqueue_like_epoll()
         else:
             return select_like_epoll()
 
@@ -146,7 +153,7 @@ class Multiplexer(Hookable):
 
 class kqueue_like_epoll(object):
     '''
-    kqueue object that behaves like an epoll object for compatibility.
+    Uses the select.kqueue interface.
     '''
 
     def __init__(self):
@@ -203,7 +210,11 @@ class kqueue_like_epoll(object):
         return events.items()
 
 
-class cooked_like_epoll(object):
+class _epoll_like_epoll(object):
+    '''
+    Using the _epoll c extension.
+    '''
+
     def __init__(self):
         self.epollfd = _epoll.create()
 
@@ -231,6 +242,10 @@ class cooked_like_epoll(object):
 
 
 class select_like_epoll(object):
+    '''
+    Using the Python select.select interface.
+    '''
+
     def __init__(self):
         self.fds = defaultdict(set)
 
