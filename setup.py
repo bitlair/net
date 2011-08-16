@@ -43,8 +43,8 @@ if sys.platform.startswith('linux'):
     lib_ax25 = compiler.find_library_file(lib_dirs, 'ax25')
     if lib_ax25:
         print lib_ax25
-        extensions.append(Extension('net/protocol/_ax25',
-            sources = ['src/protocol/_ax25.c'],
+        extensions.append(Extension('net/family/_ax25',
+            sources = ['src/family/_ax25.c'],
             libraries = ['ax25', 'ax25io'],
         ))
     else:
@@ -75,7 +75,7 @@ setup(name = 'net',
     packages = [
         'net',
         'net.async',
-        'net.protocol',
+        'net.family',
     ]
 )
  

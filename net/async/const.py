@@ -19,3 +19,18 @@ WRITABLE    = POLLOUT
 READABLE    = POLLIN
 ERROR       = POLLERR | POLLHUP | POLLRDHUP
 
+def mask_str(eventmask):
+    masks = []
+    masks.append('WRITABLE')
+    masks.append('READABLE')
+    masks.append('ERROR')
+    for item in globals():
+        if item.startswith('POLL'):
+            masks.append(item)
+
+    result = []
+    for mask in masks:
+        if eventmask & globals()[mask]:
+            result.append(mask)
+
+    return ' | '.join(result)

@@ -3,8 +3,8 @@ from ctypes.util import find_library
 import socket as python_socket
 
 # Lib AX25
-from net.protocol import _ax25
-from net.protocol import _bare, bare
+from net.family import _ax25
+from net.family import _bare, bare
 
 
 error = _ax25.error

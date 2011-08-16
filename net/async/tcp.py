@@ -7,8 +7,9 @@ from net.tools import get_errno
 
 
 class Base(NonBlocking):
-    def __init__(self, family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0):
-        super(Base, self).__init__(family, type, proto)
+    def __init__(self, family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0,
+        async=None):
+        super(Base, self).__init__(family, type, proto, async)
         self.connected  = False
         self.connecting = False
 
@@ -17,10 +18,6 @@ class Base(NonBlocking):
 
     def __unicode__(self):
         return u'<tcp.Base>'
-
-    def accept(self):
-        client, address = self.socket.accept()
-        return Client(client.fileno())
 
     def connect(self, address=None, callback=None):
         error = self.socket.connect_ex(address or self.address)
@@ -40,6 +37,7 @@ class Base(NonBlocking):
         if not self.socket:
             return
 
+        print 'handle', mask_str(eventmask)
         error = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
         try:
             if eventmask & READABLE:
@@ -139,8 +137,8 @@ class Base(NonBlocking):
                 return
 
 class Client(Base):
-    def __init__(self, address, recv_callback=None, send_callback=None):
-        super(Client, self).__init__()
+    def __init__(self, address, async=None):
+        super(Client, self).__init__(async=async)
         self.address = address
         if isinstance(address, int):
             self.from_fd(address)
@@ -151,10 +149,21 @@ class Client(Base):
 
 
 class Server(Base):
-    def __init__(self, address, backlog=128, callback=None):
-        super(Server, self).__init__()
-        self.bind(address)
-        self.listen(backlog)
+    def __init__(self, address, backlog=128, async=None):
+        super(Server, self).__init__(async=async)
+        self.socket.bind(address)
+        try:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        except socket.error:
+            pass
+        self.socket.listen(backlog)
+        self.connected = True
+        self.hook('recv', self.handle_accept)
+
+    def handle_accept(self, *args):
+        client, address = self.socket.accept()
+        print 'new client', client, 'from', address
+        return Client(client.fileno(), async=self.async)
 
     def __unicode__(self):
         return u'<tcp.Server address=%s:%d>' % (self.address[0],

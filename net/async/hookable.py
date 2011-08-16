@@ -28,6 +28,7 @@ class Hookable(object):
         self.hooks.pop(group, None)
 
     def fire(self, group, *args_override, **kwargs_override):
+        print 'fire', group
         for hook, args, kwargs in self.hooks.get(group, []):
             args = len(args_override) and args_override or args
             kwargs = len(kwargs_override) and kwargs_override or kwargs

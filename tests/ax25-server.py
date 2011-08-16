@@ -1,4 +1,4 @@
-from net.protocol import ax25
+from net.family import ax25
 import sys
 
 def tests():

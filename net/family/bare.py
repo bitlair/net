@@ -1,7 +1,7 @@
 import os
 
 # Import c extension
-from net.protocol import _bare
+from net.family import _bare
 
 for attr in dir(_bare):
     if attr.startswith('AF_') or \

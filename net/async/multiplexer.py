@@ -22,27 +22,11 @@ except ImportError:
     _kqueue = None
 
 
-def mask_str(eventmask):
-    masks = []
-    masks.append('WRITABLE')
-    masks.append('READABLE')
-    masks.append('ERROR')
-    for item in globals():
-        if item.startswith('POLL'):
-            masks.append(item)
-
-    result = []
-    for mask in masks:
-        if eventmask & globals()[mask]:
-            result.append(mask)
-
-    return ' | '.join(result)
-
-
 class Multiplexer(Hookable):
     '''
     Fast socket multiplexer.
     '''
+
     def __init__(self):
         super(Multiplexer, self).__init__()
         self.poller = Multiplexer.detect()
@@ -117,10 +101,11 @@ class Multiplexer(Hookable):
 
             if self.queued.qsize():
                 with self.queued_mutex:
-                    try:
-                        queued.append(self.queued.get(False))
-                    except Empty:
-                        break
+                    while True:
+                        try:
+                            queued.append(self.queued.get(False))
+                        except Empty:
+                            break
 
             while queued:
                 hook, args, kwargs = queued.pop(0)
